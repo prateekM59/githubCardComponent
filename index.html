@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Github Card Component</title>
+	<script type="text/javascript" src="jQuery.js"></script>
+	<script type="text/javascript" src="Underscore.js"></script>
+	<script type="text/javascript" src="Backbone-min.js"></script>
+	<script type="text/javascript" src="Controller.js"></script>
+	<script type="text/javascript" src="Utilities.js"></script>
+	<script type="text/javascript" src="UserModel.js"></script>
+	<script type="text/javascript" src="UserView.js"></script>
+	<script type="text/javascript" src="CardCollection.js"></script>
+
+	<style type="text/css">
+		* {
+			box-sizing: border-box;
+		}
+
+		.outer_container {
+			width: 90%;
+			padding-top: 50px;
+			margin: auto;
+		}
+
+		.separator {
+			width: 100%;
+		    height: 2px;
+		    background-color: #f0f1ee;
+		    margin-top: 20px;
+		    margin-bottom: 20px;
+		    margin-left: 20px;
+		}
+
+		.user_view_container {
+			border: 1px solid grey;
+			margin-left: 20px;
+			margin-bottom: 20px;
+			display: inline-block;
+    		width: 220px;
+    		height: 320px;
+    		vertical-align: top;
+    		padding: 5px;
+		}
+
+		.user_view_container .image {
+			width: 100%;
+			position: relative;
+		}
+
+		.user_view_container img {
+			max-width: 100%;
+		}
+
+		.user_view_container .remove {
+		    position: absolute;
+		    right: 3px;
+		    top: 1px;
+		    color: #000;
+		    font-family: sans-serif;
+		    font-weight: 700;
+		}
+
+		.user_view_container .meta {
+			word-wrap: break-word;
+			padding-top: 10px;
+		}
+
+		.user_view_container .meta .location, .name, .followers {
+			word-wrap: break-word;
+			font-size: 14px;
+    		font-family: sans-serif;
+    		margin: 5px 5px;
+    		font-weight: 500;
+		}
+
+		.user_view_container .meta .name {
+			font-size: 18px;
+		    font-weight: bold;
+		}
+
+		.user_view_container .meta .bold {
+		    font-weight: bold;
+		}
+
+		.sort_bar {
+			margin: 30px 20px;
+    		font-size: 14px;
+    		font-family: sans-serif;
+		}
+
+		.sort_bar div {
+			display: inline-block;
+		}
+
+		.search_container {
+			margin-left: 20px;
+		}
+
+		.search_box {
+			margin: 20px 0;
+    		height: 30px;
+		}		
+
+		.search_box .button {
+		    height: 100%;
+		    text-align: center;
+		    color: #fff;
+		    display: inline-block;
+		    vertical-align: top;
+		    border: 1px #efff1d;
+		    font-size: 14px;
+		    font-family: sans-serif;
+		    padding: 5px 10px;
+		    background-color: #1351b1;
+		}
+
+		.search_box .search {
+		    vertical-align: middle;
+		    height: 30px;
+		    font-size: 14px;
+		    padding: 12px;
+		    border: 1px #3b3b4e;
+		    display: inline-block;
+		    max-height: 100%;
+		    width: 20%;
+		    border: 1px solid #48485e;
+		}
+
+		.selected_sort {
+			text-decoration: underline;
+			color: blue;
+		}
+
+		.arrow_down {
+		 	width: 0; 
+		  	height: 0; 
+		  	border-right: 5px solid transparent;
+		  	border-bottom: 5px solid transparent; 
+		  	border-left: 5px solid transparent; 
+		  	border-top: 5px solid blue;
+		  	vertical-align: middle;
+		  	margin-right: 5px;
+		}
+
+		.arrow_up {
+		 	width: 0; 
+		  	height: 0; 
+		  	border-right: 5px solid transparent;
+		  	border-top: 5px solid transparent; 
+		  	border-left: 5px solid transparent; 
+		  	border-bottom: 5px solid blue;
+		  	vertical-align: top;
+		  	margin-right: 5px;
+		}
+
+		.visible {
+			display: inline-block !important;
+		}
+
+		.hidden {
+			display: none !important;
+		}
+
+	</style>
+</head>
+<body>
+	<div class="outer_container">
+		<div class="search_container">
+			<form id="searchBox" class="search_box">
+				<input type="text" class="search" id="searchBar" class="search_bar">
+				<input class= "button" type="submit" id="search" value="Add">
+			</form>
+		</div>
+		<div class="separator"></div>
+		<div id = "viewsContainer" class="views_container">
+			<div class="sort_bar">
+				<strong>Sort by: </strong>
+				<div id="nameSort"> 
+					Name 
+					<div class="arrow">
+						<div class='arrow_down'> </div>
+					</div>
+				</div>
+				<div id="locationSort">
+					Location
+					<div class="arrow"></div>
+				</div>
+				<div id="followersSort">
+					Followers
+					<div class="arrow"></div>
+				</div>
+			</div>
+			<div class="cards_container" id="cardsContainer">
+			</div>
+		</div>
+	</div>
+	
+	<script type="text/javascript" src="CardCollectionView.js"></script>
+	
+	<script type="text/javascript">
+		(function($) {
+			$(document).ready(function() {
+
+				// Register subcomponents in global namespace.
+				app.utils = new Utils();
+				app.users = new CardCollection();
+				app.views = new CardCollectionView({model: app.users});
+
+				var arrowDownHTML = app.ARROW_DOWN_HTML;
+				var arrowUpHTML = app.ARROW_UP_HTML
+
+				$("#nameSort").addClass("selected_sort");
+
+				$("#searchBox").submit(function() {
+					var userId = $("#searchBar").val();
+					var ajaxUrl = app.AJAX_URL + userId;
+					
+					if(!(userId in app.userMap)) {
+						$.ajax({url: ajaxUrl, type: "GET", success: function(result){
+				         	var userData = {
+				         		login: result.login,
+				         		name: result.name,
+				         		image: result.avatar_url,
+								location: result.location,
+								followers: result.followers,
+								profileLink: result.html_url
+				         	};
+				         	
+			         		var user = new UserModel(userData);
+							app.users.add(user);
+							app.userMap[userId.toLowerCase()] = userData;
+
+					    }});
+					}
+				    return false;
+				});
+
+				// TODO: Combine all below into one function.
+				$("#nameSort").click(function() {
+					if(app.sortOption === "name") {
+						app.sortOrder = !app.sortOrder;
+					} else {
+						app.sortOption = "name";
+					}
+					app.users.models = app.utils.sortCollection(app.users.models, app.sortOption, app.sortOrder);
+					app.views.render();
+					$("#nameSort").addClass("selected_sort");
+					$("#locationSort").removeClass("selected_sort");
+					$("#followersSort").removeClass("selected_sort");
+					$(".sort_bar .arrow").html('');
+					if(app.sortOrder) {
+						$(this).find(".arrow").append(arrowDownHTML);
+					} else {
+						$(this).find(".arrow").append(arrowUpHTML);
+					}
+					
+					
+				});
+
+				$("#locationSort").click(function() {
+					if(app.sortOption === "location") {
+						app.sortOrder = !app.sortOrder;
+					} else {
+						app.sortOption = "location";
+					}
+					app.users.models = app.utils.sortCollection(app.users.models, app.sortOption, app.sortOrder);
+					app.views.render();
+					$("#locationSort").addClass("selected_sort");
+					$("#nameSort").removeClass("selected_sort");
+					$("#followersSort").removeClass("selected_sort");
+					$(".sort_bar .arrow").html('');
+					if(app.sortOrder) {
+						$(this).find(".arrow").append(arrowDownHTML);
+					} else {
+						$(this).find(".arrow").append(arrowUpHTML);
+					}
+				});
+
+				$("#followersSort").click(function() {
+					if(app.sortOption === "followers") {
+						app.sortOrder = !app.sortOrder;
+					} else {
+						app.sortOption = "followers";
+					}
+					app.users.models = app.utils.sortCollection(app.users.models, app.sortOption, app.sortOrder);
+					app.views.render();
+					$("#followersSort").addClass("selected_sort");
+					$("#locationSort").removeClass("selected_sort");
+					$("#nameSort").removeClass("selected_sort");
+					$(".sort_bar .arrow").html('');
+					if(app.sortOrder) {
+						$(this).find(".arrow").append(arrowDownHTML);
+					} else {
+						$(this).find(".arrow").append(arrowUpHTML);
+					}
+				});
+
+
+			});
+	    })(jQuery);
+	</script>
+
+	<!-- Templates -->
+	<script type="text/template" id="userViewTemplate">
+		<div class="image">
+			<img src="{{data.image}}">
+			<div class="remove">X</div>
+		</div>
+		<div class="meta">
+			<div class="name">
+				{{data.name}}
+			</div>
+			<div class="location">
+				<span class="bold"> Location: </span> {{data.location}}
+			</div>
+			<div class="followers">
+				<span class="bold"> Followers: </span> {{data.followers}}
+			</div>
+		</div>
+	</script>
+
+</body>
+</html>
+
+
+
+
+
